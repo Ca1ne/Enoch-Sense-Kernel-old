@@ -22,7 +22,7 @@ static void hlist_sched_dtor(struct io_context *ioc, struct hlist_head *list)
 	if (!hlist_empty(list)) {
 		struct cfq_io_context *cic;
 
-		cic = hlist_entry(list->first, struct cfq_io_context, cic_list)
+		cic = hlist_entry(list->first, struct cfq_io_context, cic_list);
 		cic->dtor(ioc);
 	}
 }
