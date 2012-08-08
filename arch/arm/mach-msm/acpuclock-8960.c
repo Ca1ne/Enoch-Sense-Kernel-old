@@ -94,6 +94,20 @@ static void set_acpuclk_foot_print(unsigned cpu, unsigned state)
 	mb();
 }
 
+static void set_acpuclk_cpu_freq_foot_print(unsigned cpu, unsigned khz)
+{
+	unsigned *status = (unsigned *)(CPU_FOOT_PRINT_BASE_CPU0_VIRT + 0x30) + cpu;
+	*status = khz;
+	mb();
+}
+
+static void set_acpuclk_L2_freq_foot_print(unsigned khz)
+{
+	unsigned *status = (unsigned *)(CPU_FOOT_PRINT_BASE_CPU0_VIRT + 0x38);
+	*status = khz;
+	mb();
+}
+
 /*
  * Source IDs.
  * These must be negative to not overlap with the source IDs
@@ -125,16 +139,22 @@ static void set_acpuclk_foot_print(unsigned cpu, unsigned state)
 #define STBY_KHZ		1
 
 #define MAX_VDD_SC    1350000 /* uV */	
-#define MIN_VDD_SC     850000 /* uV */
+#define MIN_VDD_SC     800000 /* uV */
 #define HFPLL_NOMINAL_VDD	1050000
-#define HFPLL_LOW_VDD		 850000
+#define HFPLL_LOW_VDD		 800000
 #define HFPLL_LOW_VDD_PLL_L_MAX	0x28
 
 #define SECCLKAGD		BIT(4)
 
 /* PTE EFUSE register. */
 #define QFPROM_PTE_EFUSE_ADDR	(MSM_QFPROM_BASE + 0x00C0)
-#define FREQ_TABLE_SIZE    36
+
+/* HTC: Custom max frequency. */
+#ifdef CONFIG_ACPU_CUSTOM_FREQ_SUPPORT
+static int acpu_max_freq = CONFIG_ACPU_MAX_FREQ;
+#else
+static int acpu_max_freq = 0;
+#endif
 
 enum scalables {
 	CPU0 = 0,
@@ -411,7 +431,7 @@ static struct l2_level *l2_freq_tbl;
 static struct acpu_level *acpu_freq_tbl;
 static int l2_freq_tbl_size;
 static unsigned int max_vdd = 0;
-uint32_t global_pvs; /*  This code is temporary code */
+
 /* Instantaneous bandwidth requests in MB/s. */
 #define BW_MBPS(_bw) \
 	{ \
@@ -468,7 +488,7 @@ static struct l2_level l2_freq_tbl_8960_kraitv1[] = {
 	[11] = { {  918000, HFPLL, 1, 0, 0x22 }, 1150000, 1150000, 3 },
 };
 
-/*static struct acpu_level acpu_freq_tbl_8960_kraitv1_slow[] = {
+static struct acpu_level acpu_freq_tbl_8960_kraitv1_slow[] = {
 	{ 0, {STBY_KHZ, QSB,   0, 0, 0x00 }, L2(0),   900000 },
 	{ 1, {  384000, PLL_8, 0, 2, 0x00 }, L2(1),   900000 },
 	{ 1, {  432000, HFPLL, 2, 0, 0x20 }, L2(6),   925000 },
@@ -482,7 +502,7 @@ static struct l2_level l2_freq_tbl_8960_kraitv1[] = {
 	{ 1, {  864000, HFPLL, 1, 0, 0x20 }, L2(11), 1062500 },
 	{ 1, {  918000, HFPLL, 1, 0, 0x22 }, L2(11), 1087500 },
 	{ 0, { 0 } }
-};*/
+};
 
 static struct acpu_level acpu_freq_tbl_8960_kraitv1_nom_fast[] = {
 	{ 0, {STBY_KHZ, QSB,   0, 0, 0x00 }, L2(0),   862500 },
@@ -525,7 +545,7 @@ static struct l2_level l2_freq_tbl_8960_kraitv2[] = {
 	[19] = { { 1458000, HFPLL, 1, 0, 0x32 }, 1150000, 1150000, 7 },
 };
 
-/*static struct acpu_level acpu_freq_tbl_8960_kraitv2_slow[] = {
+static struct acpu_level acpu_freq_tbl_8960_kraitv2_slow[] = {
 	{ 0, { STBY_KHZ, QSB,   0, 0, 0x00 }, L2(0),   850000 },
 	{ 1, {   192000, PLL_8, 0, 2, 0x00 }, L2(1),   900000 },
 	{ 1, {   384000, HFPLL, 2, 0, 0x20 }, L2(7),   900000 },
@@ -556,11 +576,11 @@ static struct l2_level l2_freq_tbl_8960_kraitv2[] = {
 	{ 1, {  1998000, HFPLL, 1, 0, 0x42 }, L2(19), 1350000 },
 	{ 1, {  2106000, HFPLL, 1, 0, 0x44 }, L2(19), 1350000 },
 	{ 0, { 0 } }
-};*/
+};
 
 static struct acpu_level acpu_freq_tbl_8960_kraitv2_nom[] = {
-	{ 0, { STBY_KHZ, QSB,   0, 0, 0x00 }, L2(0),   850000 },
-	{ 1, {   192000, PLL_8, 0, 2, 0x00 }, L2(1),   850000 },
+	{ 0, { STBY_KHZ, QSB,   0, 0, 0x00 }, L2(0),   800000 },
+	{ 1, {   192000, PLL_8, 0, 2, 0x00 }, L2(1),   800000 },
 	{ 1, {   384000, HFPLL, 2, 0, 0x20 }, L2(7),   850000 },
 	{ 1, {   486000, HFPLL, 2, 0, 0x24 }, L2(7),   900000 },
 	{ 0, {   540000, HFPLL, 2, 0, 0x28 }, L2(7),   950000 },
@@ -591,10 +611,10 @@ static struct acpu_level acpu_freq_tbl_8960_kraitv2_nom[] = {
 	{ 0, { 0 } }
 };
 
-/*static struct acpu_level acpu_freq_tbl_8960_kraitv2_fast[] = {
-	{ 0, { STBY_KHZ, QSB,   0, 0, 0x00 }, L2(0),   850000 },
-	{ 1, {   192000, PLL_8, 0, 2, 0x00 }, L2(1),   850000 },
-	{ 1, {   384000, HFPLL, 2, 0, 0x20 }, L2(7),   850000 },
+static struct acpu_level acpu_freq_tbl_8960_kraitv2_fast[] = {
+	{ 0, { STBY_KHZ, QSB,   0, 0, 0x00 }, L2(0),   800000 },
+	{ 1, {   192000, PLL_8, 0, 2, 0x00 }, L2(1),   800000 },
+	{ 1, {   384000, HFPLL, 2, 0, 0x20 }, L2(7),   800000 },
 	{ 1, {   486000, HFPLL, 2, 0, 0x24 }, L2(7),   850000 },
 	{ 0, {   540000, HFPLL, 2, 0, 0x28 }, L2(7),   900000 },
 	{ 1, {   594000, HFPLL, 1, 0, 0x16 }, L2(7),   900000 },
@@ -622,7 +642,7 @@ static struct acpu_level acpu_freq_tbl_8960_kraitv2_nom[] = {
 	{ 1, {  1998000, HFPLL, 1, 0, 0x42 }, L2(19), 1300000 },
 	{ 1, {  2106000, HFPLL, 1, 0, 0x44 }, L2(19), 1325000 },
 	{ 0, { 0 } }
-};*/
+};
 
 /* TODO: Update vdd_dig and vdd_mem when voltage data is available. */
 #undef L2
@@ -1137,6 +1157,8 @@ static int acpuclk_8960_set_rate(int cpu, unsigned long rate,
 	unsigned long flags;
 	int rc = 0;
 
+	set_acpuclk_foot_print(cpu, 0x1);
+
 	if (cpu > num_possible_cpus()) {
 		rc = -EINVAL;
 		goto out;
@@ -1144,6 +1166,8 @@ static int acpuclk_8960_set_rate(int cpu, unsigned long rate,
 
 	if (reason == SETRATE_CPUFREQ || reason == SETRATE_HOTPLUG)
 		mutex_lock(&driver_lock);
+
+	set_acpuclk_foot_print(cpu, 0x2);
 
 	strt_acpu_s = scalable[cpu].current_speed;
 
@@ -1183,6 +1207,9 @@ static int acpuclk_8960_set_rate(int cpu, unsigned long rate,
 	/* Set the CPU speed. */
 	set_speed(&scalable[cpu], tgt_acpu_s, reason);
 
+	set_acpuclk_cpu_freq_foot_print(cpu, tgt_acpu_s->khz);
+	set_acpuclk_foot_print(cpu, 0x4);
+
 	/*
 	 * Update the L2 vote and apply the rate change. A spinlock is
 	 * necessary to ensure L2 rate is calulated and set atomically,
@@ -1192,6 +1219,10 @@ static int acpuclk_8960_set_rate(int cpu, unsigned long rate,
 	spin_lock_irqsave(&l2_lock, flags);
 	tgt_l2_l = compute_l2_level(&scalable[cpu], tgt->l2_level);
 	set_speed(&scalable[L2], &tgt_l2_l->speed, reason);
+
+	set_acpuclk_L2_freq_foot_print(tgt_l2_l->speed.khz);
+	set_acpuclk_foot_print(cpu, 0x5);
+
 	spin_unlock_irqrestore(&l2_lock, flags);
 
 	/* Nothing else to do for power collapse or SWFI. */
@@ -1201,8 +1232,12 @@ static int acpuclk_8960_set_rate(int cpu, unsigned long rate,
 	/* Update bus bandwith request. */
 	set_bus_bw(tgt_l2_l->bw_level);
 
+	set_acpuclk_foot_print(cpu, 0x6);
+
 	/* Drop VDD levels if we can. */
 	decrease_vdd(cpu, vdd_core, vdd_mem, vdd_dig, reason);
+
+	set_acpuclk_foot_print(cpu, 0x7);
 
 	scalable[cpu].first_set_call = false;
 	pr_debug("ACPU%d speed change complete\n", cpu);
@@ -1210,6 +1245,9 @@ static int acpuclk_8960_set_rate(int cpu, unsigned long rate,
 out:
 	if (reason == SETRATE_CPUFREQ || reason == SETRATE_HOTPLUG)
 		mutex_unlock(&driver_lock);
+
+	set_acpuclk_foot_print(cpu, 0x8);
+
 	return rc;
 }
 
@@ -1392,7 +1430,7 @@ static void __init bus_init(void)
 }
 
 #ifdef CONFIG_CPU_FREQ_MSM
-static struct cpufreq_frequency_table freq_table[NR_CPUS][FREQ_TABLE_SIZE];
+static struct cpufreq_frequency_table freq_table[NR_CPUS][30];
 
 static void __init cpufreq_table_init(void)
 {
@@ -1500,6 +1538,7 @@ static void kraitv2_apply_vmin(struct acpu_level *tbl)
 static struct acpu_level * __init select_freq_plan(void)
 {
 	struct acpu_level *l, *max_acpu_level = NULL;
+	unsigned int kernel_flag = get_kernel_flag();
 
 	/* Select frequency tables. */
 	if (cpu_is_msm8960()) {
@@ -1514,13 +1553,41 @@ static struct acpu_level * __init select_freq_plan(void)
 		switch (pvs) {
 		case 0x0:
 		case 0x7:
+			pr_info("ACPU PVS: Slow\n");
+			v1 = acpu_freq_tbl_8960_kraitv1_slow;
+			v2 = acpu_freq_tbl_8960_kraitv2_slow;
+			break;
 		case 0x1:
-		case 0x3:
-		default:
-			pr_alert("ACPU PVS: Fast\n");
+			pr_info("ACPU PVS: Nominal\n");
 			v1 = acpu_freq_tbl_8960_kraitv1_nom_fast;
 			v2 = acpu_freq_tbl_8960_kraitv2_nom;
 			break;
+		case 0x3:
+			pr_info("ACPU PVS: Fast\n");
+			v1 = acpu_freq_tbl_8960_kraitv1_nom_fast;
+			v2 = acpu_freq_tbl_8960_kraitv2_fast;
+			break;
+		default:
+			pr_warn("ACPU PVS: Unknown. Defaulting to slow.\n");
+			v1 = acpu_freq_tbl_8960_kraitv1_slow;
+			v2 = acpu_freq_tbl_8960_kraitv2_slow;
+			break;
+		}
+
+		/* Force apply CPU table by writeconfig */
+		if (!cpu_is_krait_v1()){
+			if(kernel_flag & KERNEL_FLAG_PVS_SLOW_CPU){
+				pr_info("ACPU PVS: Force SLOW by writeconfig\n");
+				v2 = acpu_freq_tbl_8960_kraitv2_slow;
+			}
+			else if (kernel_flag & KERNEL_FLAG_PVS_NOM_CPU){
+				pr_info("ACPU PVS: Force NOMINAL by writeconfig\n");
+				v2 = acpu_freq_tbl_8960_kraitv2_nom;
+			}
+			else if (kernel_flag & KERNEL_FLAG_PVS_FAST_CPU){
+				v2 = acpu_freq_tbl_8960_kraitv2_fast;
+				pr_info("ACPU PVS: Force FAST by writeconfig\n");
+			}
 		}
 
 		scalable = scalable_8960;
@@ -1556,9 +1623,24 @@ static struct acpu_level * __init select_freq_plan(void)
 		kraitv2_apply_vmin(acpu_freq_tbl);
 	}
 
+	/* Adjust frequency table according to custom acpu_max_freq */
+	if (acpu_max_freq) {
+		for (l = acpu_freq_tbl; l->speed.khz != 0; l++) {
+			if (l->speed.khz == acpu_max_freq) {
+				/* Custom max freq found in table.
+				 * Mark all subsequent frequencies
+				 * as not supported.
+				 */
+				for (++l; l->speed.khz != 0; l++)
+					l->use_for_scaling = 0;
+				break;
+			}
+		}
+	}
+
 	/* Find the max supported scaling frequency. */
 	for (l = acpu_freq_tbl; l->speed.khz != 0; l++)
-		if (l->use_for_scaling)
+		if (l->use_for_scaling && l->speed.khz==1512000)
 			max_acpu_level = l;
 	BUG_ON(!max_acpu_level);
 	pr_info("Max ACPU freq: %u KHz\n", max_acpu_level->speed.khz);
