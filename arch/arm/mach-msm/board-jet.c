@@ -5150,7 +5150,7 @@ static struct pm8xxx_led_configure pm8921_led_info[] = {
 		.duites_size 	= 8,
 		.duty_time_ms 	= 64,
 		.lut_flag 	= PM_PWM_LUT_RAMP_UP | PM_PWM_LUT_PAUSE_HI_EN,
-		.out_current    = 40,
+		.out_current    = 2,
 		.duties		= {0, 15, 30, 45, 60, 75, 90, 100,
 				100, 90, 75, 60, 45, 30, 15, 0,
 				0, 0, 0, 0, 0, 0, 0, 0,
