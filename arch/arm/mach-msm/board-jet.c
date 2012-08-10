@@ -4226,11 +4226,27 @@ static struct msm_spm_platform_data msm_spm_data[] __initdata = {
 
 #ifdef CONFIG_PERFLOCK
 static unsigned jet_perf_acpu_table[] = {
+#ifdef CONFIG_MSM_CPU_MAX_CLK_2DOT1GHZ
 	918000000, /* LOWEST */
 	1188000000, /* LOW */
 	1512000000, /* MEDIUM */
 	1890000000,/* HIGH */
 	2106000000, /* HIGHEST */
+#endif
+#ifdef CONFIG_MSM_CPU_MAX_CLK_1DOT89GHZ
+	864000000, /* LOWEST */
+	918000000, /* LOW */
+	1188000000, /* MEDIUM */
+	1512000000,/* HIGH */
+	1890000000, /* HIGHEST */
+#endif
+#ifdef CONFIG_MSM_CPU_MAX_CLK_1DOT5GHZ
+	810000000, /* LOWEST */
+	918000000, /* LOW */
+	1026000000, /* MEDIUM */
+	1242000000, /* HIGH */
+	1512000000, /* HIGHEST */
+#endif
 };
 
 static struct perflock_platform_data jet_perflock_data = {
