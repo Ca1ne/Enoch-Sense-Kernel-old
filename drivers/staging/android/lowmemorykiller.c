@@ -222,7 +222,7 @@ static int lmk_hotplug_callback(struct notifier_block *self,
 
 static int lowmem_shrink(struct shrinker *s, struct shrink_control *sc)
 {
-	truct task_struct *tsk;
+	struct task_struct *tsk;
 	struct task_struct *selected = NULL;
 	int rem = 0;
 	int tasksize;
