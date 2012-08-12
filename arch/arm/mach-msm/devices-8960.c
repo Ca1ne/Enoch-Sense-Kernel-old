@@ -2550,7 +2550,7 @@ static struct kgsl_device_platform_data kgsl_3d0_pdata = {
 			.gpu_freq = 27000000,
 			.bus_freq = 0,
 			.io_fraction = 100,
-		},
+		},		
 	},
 	.init_level = 0,
 	.num_levels = 3,
